@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Whisper Small — Diagnostic WebGPU</title>
+    <title>Whisper Small — WebGPU optimisé</title>
 
     <style>
         body {
@@ -69,14 +69,22 @@
 
 <body>
 
-    <h2>Whisper Small — Diagnostic du premier chargement</h2>
+    <h2>Whisper Small — WebGPU optimisé</h2>
+
 
     <div class="bloc">
 
-        <b>WebGPU :</b>
+        <b>Configuration :</b>
+
+        <p>
+            Modèle : Whisper Small<br>
+            Encodeur : FP16<br>
+            Décodeur : Q8<br>
+            Exécution : WebGPU
+        </p>
 
         <p id="gpu">
-            Vérification...
+            Vérification de WebGPU...
         </p>
 
     </div>
@@ -116,8 +124,7 @@
             —
         </p>
 
-        <div id="detailsChargement">
-        </div>
+        <div id="detailsChargement"></div>
 
     </div>
 
@@ -137,7 +144,10 @@
 
         <b>Texte reconnu :</b>
 
-        <p id="resultat" class="arabe">
+        <p
+            id="resultat"
+            class="arabe"
+        >
             —
         </p>
 
@@ -166,7 +176,10 @@
     </div>
 
 
-    <script type="module" src="./app.js"></script>
+    <script
+        type="module"
+        src="./app.js"
+    ></script>
 
 </body>
 
