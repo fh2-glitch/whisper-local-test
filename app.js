@@ -12,7 +12,7 @@ const TARGET_PHRASE =
 
 
 /* =========================================================
-   AUDIO
+   PARAMÈTRES AUDIO
    ========================================================= */
 
 const MAX_RECORDING_TIME = 10000;
@@ -32,30 +32,15 @@ let transcriber = null;
 
 let busy = false;
 
-let useWebGPU = false;
-
 let tempsChargementWhisper = null;
 
 let numeroAnalyse = 0;
 
-
-/* =========================================================
-   DIAGNOSTIC
-   ========================================================= */
-
-let debutChargement = 0;
-
-let premierTelechargement = null;
-
-let dernierTelechargement = null;
-
-let totalBytesTelecharges = 0;
-
-const fichiers = new Map();
+let useWebGPU = false;
 
 
 /* =========================================================
-   HTML
+   ÉLÉMENTS HTML
    ========================================================= */
 
 const charger =
@@ -78,18 +63,6 @@ const performances =
 
 const gpu =
     document.getElementById("gpu");
-
-const progressBar =
-    document.getElementById("progressBar");
-
-const progressText =
-    document.getElementById("progressText");
-
-const diagnostic =
-    document.getElementById("diagnostic");
-
-const detailsChargement =
-    document.getElementById("detailsChargement");
 
 
 /* =========================================================
@@ -119,7 +92,7 @@ async function detectWebGPU() {
         if (adapter) {
 
             gpu.textContent =
-                "WebGPU disponible : OUI";
+                "WebGPU disponible : OUI — Whisper utilisera le GPU";
 
             useWebGPU = true;
 
@@ -138,7 +111,11 @@ async function detectWebGPU() {
 
     catch (error) {
 
-        console.error(error);
+        console.error(
+            "Erreur WebGPU :",
+            error
+        );
+
 
         gpu.textContent =
             "WebGPU disponible : NON";
@@ -154,58 +131,32 @@ await detectWebGPU();
 
 
 /* =========================================================
-   CHARGEMENT WHISPER SMALL
-   FP16 ENCODEUR + Q8 DÉCODEUR
+   CHARGEMENT DE WHISPER
    ========================================================= */
 
 charger.onclick = async () => {
 
+    charger.disabled = true;
+
+
     if (!useWebGPU) {
 
         etat.textContent =
-            "WebGPU n'est pas disponible.";
+            "WebGPU n'est pas disponible sur cet appareil.";
+
+        charger.disabled = false;
 
         return;
 
     }
 
 
-    charger.disabled = true;
-
-    parler.disabled = true;
-
-
-    progressBar.style.width =
-        "0%";
-
-
-    progressText.textContent =
-        "Préparation du chargement...";
-
-
-    detailsChargement.textContent =
-        "";
-
-
-    diagnostic.textContent =
-        "Diagnostic en cours...";
-
-
-    fichiers.clear();
-
-    totalBytesTelecharges = 0;
-
-    premierTelechargement = null;
-
-    dernierTelechargement = null;
-
-
-    debutChargement =
-        performance.now();
-
-
     etat.textContent =
-        "Chargement de Whisper Small FP16/Q8 avec WebGPU...";
+        "Chargement de Whisper Small avec WebGPU...";
+
+
+    const debutChargement =
+        performance.now();
 
 
     try {
@@ -218,164 +169,11 @@ charger.onclick = async () => {
                 "onnx-community/whisper-small",
 
                 {
-
-                    device: "webgpu",
-
-
-                    /* =========================================
-                       IMPORTANT :
-                       ENCODEUR FP16
-                       DÉCODEUR Q8
-                       ========================================= */
-
-                    dtype: {
-
-                        encoder_model:
-                            "fp16",
-
-                        decoder_model_merged:
-                            "q8"
-
-                    },
-
-
-                    /* =========================================
-                       PROGRESSION
-                       ========================================= */
-
-                    progress_callback: info => {
-
-                        const maintenant =
-                            performance.now();
-
-
-                        /* -------------------------------------
-                           DÉBUT DU TÉLÉCHARGEMENT
-                           ------------------------------------- */
-
-                        if (
-                            info.status === "download"
-                        ) {
-
-                            if (
-                                premierTelechargement === null
-                            ) {
-
-                                premierTelechargement =
-                                    maintenant;
-
-                            }
-
-
-                            const nom =
-                                info.file ||
-                                "fichier inconnu";
-
-
-                            if (
-                                !fichiers.has(nom)
-                            ) {
-
-                                fichiers.set(
-                                    nom,
-                                    {
-                                        loaded: 0,
-                                        total: 0
-                                    }
-                                );
-
-                            }
-
-                        }
-
-
-                        /* -------------------------------------
-                           PROGRESSION D'UN FICHIER
-                           ------------------------------------- */
-
-                        if (
-                            info.status === "progress"
-                        ) {
-
-                            if (
-                                premierTelechargement === null
-                            ) {
-
-                                premierTelechargement =
-                                    maintenant;
-
-                            }
-
-
-                            dernierTelechargement =
-                                maintenant;
-
-
-                            const nom =
-                                info.file ||
-                                "fichier inconnu";
-
-
-                            fichiers.set(
-
-                                nom,
-
-                                {
-                                    loaded:
-                                        info.loaded || 0,
-
-                                    total:
-                                        info.total || 0
-                                }
-
-                            );
-
-
-                            if (
-                                typeof info.progress ===
-                                "number"
-                            ) {
-
-                                progressText.textContent =
-
-                                    `${nom} : ` +
-
-                                    `${info.progress.toFixed(1)}%`;
-
-                            }
-
-
-                            afficherDetails();
-
-                        }
-
-
-                        /* -------------------------------------
-                           FICHIER TERMINÉ
-                           ------------------------------------- */
-
-                        if (
-                            info.status === "done"
-                        ) {
-
-                            dernierTelechargement =
-                                maintenant;
-
-
-                            afficherDetails();
-
-                        }
-
-                    }
-
+                    device: "webgpu"
                 }
 
             );
 
-
-        /* =====================================================
-           FIN DU CHARGEMENT
-           ===================================================== */
 
         const finChargement =
             performance.now();
@@ -391,157 +189,32 @@ charger.onclick = async () => {
             ).toFixed(1);
 
 
-        /* =====================================================
-           TEMPS DE TÉLÉCHARGEMENT
-           ===================================================== */
-
-        let tempsTelechargement =
-            0;
-
-
-        if (
-            premierTelechargement !== null &&
-            dernierTelechargement !== null
-        ) {
-
-            tempsTelechargement =
-
-                (
-                    (
-                        dernierTelechargement -
-                        premierTelechargement
-                    )
-                    / 1000
-                );
-
-        }
-
-
-        /* =====================================================
-           TAILLE TOTALE
-           ===================================================== */
-
-        totalBytesTelecharges =
-            0;
-
-
-        for (
-            const valeur
-            of fichiers.values()
-        ) {
-
-            if (
-                valeur.total >
-                valeur.loaded
-            ) {
-
-                totalBytesTelecharges +=
-                    valeur.total;
-
-            }
-
-            else {
-
-                totalBytesTelecharges +=
-                    valeur.loaded;
-
-            }
-
-        }
-
-
-        const totalMo =
-
-            totalBytesTelecharges /
-
-            1024 /
-
-            1024;
-
-
-        /* =====================================================
-           INITIALISATION APRÈS TÉLÉCHARGEMENT
-           ===================================================== */
-
-        let tempsApresTelechargement =
-            0;
-
-
-        if (
-            dernierTelechargement !== null
-        ) {
-
-            tempsApresTelechargement =
-
-                (
-                    (
-                        finChargement -
-                        dernierTelechargement
-                    )
-                    / 1000
-                );
-
-        }
-
-
-        progressBar.style.width =
-            "100%";
-
-
-        progressText.textContent =
-            "Chargement terminé";
-
-
         etat.textContent =
-            "Whisper Small FP16/Q8 est prêt.";
-
-
-        diagnostic.innerHTML =
-
-            `<b>Temps total pipeline :</b> ` +
-            `${tempsChargementWhisper} s<br>` +
-
-            `<b>Téléchargement observé :</b> ` +
-            `${tempsTelechargement.toFixed(1)} s<br>` +
-
-            `<b>Après le dernier téléchargement :</b> ` +
-            `${tempsApresTelechargement.toFixed(1)} s<br>` +
-
-            `<b>Données observées :</b> ` +
-            `${totalMo.toFixed(1)} Mo<br>` +
-
-            `<b>Nombre de fichiers observés :</b> ` +
-            `${fichiers.size}`;
+            `Whisper est prêt — WebGPU — Chargement : ${tempsChargementWhisper} s`;
 
 
         performances.innerHTML =
-
             `Mode : WebGPU<br>` +
-
-            `Encodeur : FP16<br>` +
-
-            `Décodeur : Q8<br>` +
-
-            `Chargement Whisper : ` +
-            `${tempsChargementWhisper} s`;
+            `Chargement Whisper : ${tempsChargementWhisper} s`;
 
 
-        parler.disabled =
-            false;
+        parler.disabled = false;
 
     }
 
     catch (error) {
 
-        console.error(error);
+        console.error(
+            "Erreur chargement Whisper WebGPU :",
+            error
+        );
 
 
         etat.textContent =
-            "Erreur pendant le chargement. Ouvre F12 > Console.";
+            "Erreur pendant le chargement de Whisper avec WebGPU. Ouvre F12 > Console.";
 
 
-        charger.disabled =
-            false;
+        charger.disabled = false;
 
     }
 
@@ -549,78 +222,7 @@ charger.onclick = async () => {
 
 
 /* =========================================================
-   AFFICHAGE DES FICHIERS
-   ========================================================= */
-
-function afficherDetails() {
-
-    let texte =
-        "";
-
-
-    for (
-        const [nom, valeur]
-        of fichiers.entries()
-    ) {
-
-        const loadedMo =
-
-            valeur.loaded /
-
-            1024 /
-
-            1024;
-
-
-        const totalMo =
-
-            valeur.total /
-
-            1024 /
-
-            1024;
-
-
-        let pct =
-            0;
-
-
-        if (
-            valeur.total > 0
-        ) {
-
-            pct =
-
-                valeur.loaded /
-
-                valeur.total *
-
-                100;
-
-        }
-
-
-        texte +=
-
-            `${nom}\n` +
-
-            `  ${loadedMo.toFixed(1)} / ` +
-
-            `${totalMo.toFixed(1)} Mo ` +
-
-            `(${pct.toFixed(0)}%)\n\n`;
-
-    }
-
-
-    detailsChargement.textContent =
-        texte;
-
-}
-
-
-/* =========================================================
-   RECONNAISSANCE
+   ENREGISTREMENT + WHISPER
    ========================================================= */
 
 parler.onclick = async () => {
@@ -635,20 +237,13 @@ parler.onclick = async () => {
     }
 
 
-    busy =
-        true;
+    busy = true;
 
+    parler.disabled = true;
 
-    parler.disabled =
-        true;
+    resultat.textContent = "—";
 
-
-    resultat.textContent =
-        "—";
-
-
-    comparaison.textContent =
-        "—";
+    comparaison.textContent = "—";
 
 
     try {
@@ -693,7 +288,6 @@ parler.onclick = async () => {
 
 
         const tempsAnalyse =
-
             (
                 (
                     finAnalyse -
@@ -707,7 +301,6 @@ parler.onclick = async () => {
 
 
         const recognized =
-
             (
                 output?.text ||
                 ""
@@ -715,9 +308,7 @@ parler.onclick = async () => {
 
 
         resultat.textContent =
-
             recognized ||
-
             "(aucun texte reconnu)";
 
 
@@ -726,11 +317,9 @@ parler.onclick = async () => {
            ===================================================== */
 
         const recognizedNormalized =
-
             normalizeArabic(
                 recognized
             )
-
             .replace(
                 /\s/g,
                 ""
@@ -738,11 +327,9 @@ parler.onclick = async () => {
 
 
         const expectedNormalized =
-
             normalizeArabic(
                 TARGET_PHRASE
             )
-
             .replace(
                 /\s/g,
                 ""
@@ -754,7 +341,6 @@ parler.onclick = async () => {
            ===================================================== */
 
         const distance =
-
             levenshtein(
 
                 recognizedNormalized,
@@ -765,7 +351,6 @@ parler.onclick = async () => {
 
 
         const errorRate =
-
             expectedNormalized.length
 
                 ?
@@ -779,11 +364,14 @@ parler.onclick = async () => {
 
 
         const errorPercent =
-
             Math.round(
                 errorRate * 100
             );
 
+
+        /* =====================================================
+           RÉSULTAT
+           ===================================================== */
 
         comparaison.textContent =
 
@@ -804,46 +392,45 @@ parler.onclick = async () => {
             );
 
 
+        /* =====================================================
+           PERFORMANCES
+           ===================================================== */
+
         etat.textContent =
 
             `Analyse terminée — ` +
 
-            `${tempsAnalyse} s`;
+            `WebGPU — ` +
+
+            `Temps : ${tempsAnalyse} s`;
 
 
         performances.innerHTML =
 
             `Mode : WebGPU<br>` +
 
-            `Encodeur : FP16<br>` +
+            `Chargement Whisper : ${tempsChargementWhisper} s<br>` +
 
-            `Décodeur : Q8<br>` +
-
-            `Chargement Whisper : ` +
-
-            `${tempsChargementWhisper} s<br>` +
-
-            `Analyse n°${numeroAnalyse} : ` +
-
-            `${tempsAnalyse} s`;
+            `Analyse n°${numeroAnalyse} : ${tempsAnalyse} s`;
 
     }
 
     catch (error) {
 
-        console.error(error);
+        console.error(
+            "Erreur reconnaissance :",
+            error
+        );
 
 
         etat.textContent =
-            "Erreur pendant l'analyse.";
+            "Erreur pendant l'analyse. Ouvre F12 > Console.";
 
     }
 
     finally {
 
-        busy =
-            false;
-
+        busy = false;
 
         parler.disabled =
             !transcriber;
@@ -860,23 +447,18 @@ parler.onclick = async () => {
 async function recordAudio() {
 
     const stream =
-
         await navigator.mediaDevices
-
             .getUserMedia({
                 audio: true
             });
 
 
     const AudioContextClass =
-
         window.AudioContext ||
-
         window.webkitAudioContext;
 
 
     const audioContext =
-
         new AudioContextClass();
 
 
@@ -884,18 +466,14 @@ async function recordAudio() {
 
 
     const source =
-
         audioContext
-
             .createMediaStreamSource(
                 stream
             );
 
 
     const processor =
-
         audioContext
-
             .createScriptProcessor(
                 4096,
                 1,
@@ -903,21 +481,15 @@ async function recordAudio() {
             );
 
 
-    const chunks =
-        [];
+    const chunks = [];
 
 
-    let hasStartedSpeaking =
-        false;
-
+    let hasStartedSpeaking = false;
 
     let lastVoiceTime =
         Date.now();
 
-
-    let finished =
-        false;
-
+    let finished = false;
 
     let maxTimer;
 
@@ -936,8 +508,7 @@ async function recordAudio() {
                     return;
 
 
-                finished =
-                    true;
+                finished = true;
 
 
                 clearTimeout(
@@ -957,9 +528,7 @@ async function recordAudio() {
 
 
                 stream
-
                     .getTracks()
-
                     .forEach(
                         track =>
                             track.stop()
@@ -967,21 +536,17 @@ async function recordAudio() {
 
 
                 const merged =
-
                     mergeBuffers(
                         chunks
                     );
 
 
                 const originalSampleRate =
-
                     audioContext.sampleRate;
 
 
                 audioContext
-
                     .close()
-
                     .catch(
                         () => {}
                     );
@@ -1001,8 +566,7 @@ async function recordAudio() {
                 }
 
 
-                resolve(
-
+                const audio16k =
                     resampleAudio(
 
                         merged,
@@ -1011,8 +575,11 @@ async function recordAudio() {
 
                         WHISPER_SAMPLE_RATE
 
-                    )
+                    );
 
+
+                resolve(
+                    audio16k
                 );
 
             }
@@ -1027,11 +594,8 @@ async function recordAudio() {
 
 
                     const input =
-
                         event
-
                             .inputBuffer
-
                             .getChannelData(0);
 
 
@@ -1044,8 +608,7 @@ async function recordAudio() {
                     );
 
 
-                    let sumSquares =
-                        0;
+                    let sumSquares = 0;
 
 
                     for (
@@ -1055,20 +618,16 @@ async function recordAudio() {
                     ) {
 
                         sumSquares +=
-
                             input[i] *
-
                             input[i];
 
                     }
 
 
                     const rms =
-
                         Math.sqrt(
 
                             sumSquares /
-
                             input.length
 
                         );
@@ -1083,12 +642,9 @@ async function recordAudio() {
                         SILENCE_THRESHOLD
                     ) {
 
-                        hasStartedSpeaking =
-                            true;
+                        hasStartedSpeaking = true;
 
-
-                        lastVoiceTime =
-                            now;
+                        lastVoiceTime = now;
 
                     }
 
@@ -1121,7 +677,6 @@ async function recordAudio() {
 
 
             maxTimer =
-
                 setTimeout(
 
                     finishRecording,
@@ -1137,15 +692,14 @@ async function recordAudio() {
 
 
 /* =========================================================
-   AUDIO HELPERS
+   FUSION AUDIO
    ========================================================= */
 
 function mergeBuffers(
     chunks
 ) {
 
-    let totalLength =
-        0;
+    let totalLength = 0;
 
 
     for (
@@ -1159,14 +713,12 @@ function mergeBuffers(
 
 
     const result =
-
         new Float32Array(
             totalLength
         );
 
 
-    let offset =
-        0;
+    let offset = 0;
 
 
     for (
@@ -1190,6 +742,10 @@ function mergeBuffers(
 }
 
 
+/* =========================================================
+   RESAMPLING 16 kHz
+   ========================================================= */
+
 function resampleAudio(
 
     input,
@@ -1211,25 +767,20 @@ function resampleAudio(
 
 
     const ratio =
-
         inputSampleRate /
-
         outputSampleRate;
 
 
     const outputLength =
-
         Math.round(
 
             input.length /
-
             ratio
 
         );
 
 
     const output =
-
         new Float32Array(
             outputLength
         );
@@ -1261,7 +812,6 @@ function resampleAudio(
 
 
         const sample2 =
-
             input[
                 Math.min(
 
@@ -1270,22 +820,15 @@ function resampleAudio(
                     input.length - 1
 
                 )
-            ]
-
-            ?? sample1;
+            ] ?? sample1;
 
 
         output[i] =
-
             sample1 +
-
             (
                 sample2 -
                 sample1
-            )
-
-            *
-
+            ) *
             fraction;
 
     }
@@ -1356,7 +899,6 @@ function levenshtein(
 ) {
 
     const matrix =
-
         Array.from(
 
             {
@@ -1365,7 +907,6 @@ function levenshtein(
             },
 
             () =>
-
                 Array(
                     a.length + 1
                 )
@@ -1379,8 +920,7 @@ function levenshtein(
         i++
     ) {
 
-        matrix[i][0] =
-            i;
+        matrix[i][0] = i;
 
     }
 
@@ -1391,8 +931,7 @@ function levenshtein(
         j++
     ) {
 
-        matrix[0][j] =
-            j;
+        matrix[0][j] = j;
 
     }
 
@@ -1412,7 +951,7 @@ function levenshtein(
             const cost =
 
                 b[i - 1] ===
-                    a[j - 1]
+                a[j - 1]
 
                     ?
 
@@ -1427,14 +966,12 @@ function levenshtein(
 
                 Math.min(
 
-                    matrix[i - 1][j]
-                    + 1,
+                    matrix[i - 1][j] + 1,
 
-                    matrix[i][j - 1]
-                    + 1,
+                    matrix[i][j - 1] + 1,
 
-                    matrix[i - 1][j - 1]
-                    + cost
+                    matrix[i - 1][j - 1] +
+                    cost
 
                 );
 
