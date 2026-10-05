@@ -12,7 +12,7 @@ const TARGET_PHRASE =
 
 
 /* =========================================================
-   PARAMÈTRES AUDIO
+   AUDIO
    ========================================================= */
 
 const MAX_RECORDING_TIME = 10000;
@@ -32,15 +32,30 @@ let transcriber = null;
 
 let busy = false;
 
+let useWebGPU = false;
+
 let tempsChargementWhisper = null;
 
 let numeroAnalyse = 0;
 
-let useWebGPU = false;
+
+/* =========================================================
+   DIAGNOSTIC
+   ========================================================= */
+
+let debutChargement = 0;
+
+let premierTelechargement = null;
+
+let dernierTelechargement = null;
+
+let totalBytesTelecharges = 0;
+
+const fichiers = new Map();
 
 
 /* =========================================================
-   ÉLÉMENTS HTML
+   HTML
    ========================================================= */
 
 const charger =
@@ -64,9 +79,21 @@ const performances =
 const gpu =
     document.getElementById("gpu");
 
+const progressBar =
+    document.getElementById("progressBar");
+
+const progressText =
+    document.getElementById("progressText");
+
+const diagnostic =
+    document.getElementById("diagnostic");
+
+const detailsChargement =
+    document.getElementById("detailsChargement");
+
 
 /* =========================================================
-   DÉTECTION WEBGPU
+   WEBGPU
    ========================================================= */
 
 async function detectWebGPU() {
@@ -92,7 +119,7 @@ async function detectWebGPU() {
         if (adapter) {
 
             gpu.textContent =
-                "WebGPU disponible : OUI — Whisper utilisera le GPU";
+                "WebGPU disponible : OUI";
 
             useWebGPU = true;
 
@@ -111,11 +138,7 @@ async function detectWebGPU() {
 
     catch (error) {
 
-        console.error(
-            "Erreur WebGPU :",
-            error
-        );
-
+        console.error(error);
 
         gpu.textContent =
             "WebGPU disponible : NON";
@@ -131,32 +154,57 @@ await detectWebGPU();
 
 
 /* =========================================================
-   CHARGEMENT DE WHISPER
+   CHARGEMENT WHISPER
    ========================================================= */
 
 charger.onclick = async () => {
 
-    charger.disabled = true;
-
-
     if (!useWebGPU) {
 
         etat.textContent =
-            "WebGPU n'est pas disponible sur cet appareil.";
-
-        charger.disabled = false;
+            "WebGPU n'est pas disponible.";
 
         return;
 
     }
 
 
+    charger.disabled = true;
+
+    parler.disabled = true;
+
+
+    progressBar.style.width =
+        "0%";
+
+
+    progressText.textContent =
+        "Préparation du chargement...";
+
+
+    detailsChargement.textContent =
+        "";
+
+
+    diagnostic.textContent =
+        "Diagnostic en cours...";
+
+
+    fichiers.clear();
+
+    totalBytesTelecharges = 0;
+
+    premierTelechargement = null;
+
+    dernierTelechargement = null;
+
+
+    debutChargement =
+        performance.now();
+
+
     etat.textContent =
         "Chargement de Whisper Small avec WebGPU...";
-
-
-    const debutChargement =
-        performance.now();
 
 
     try {
@@ -169,7 +217,153 @@ charger.onclick = async () => {
                 "onnx-community/whisper-small",
 
                 {
-                    device: "webgpu"
+
+                    device: "webgpu",
+
+
+                    /* =========================================
+                       PROGRESSION DU CHARGEMENT
+                       ========================================= */
+
+                    progress_callback: info => {
+
+                        const maintenant =
+                            performance.now();
+
+
+                        /* -------------------------------------
+                           PROGRESSION GLOBALE
+                           ------------------------------------- */
+
+                        if (
+                            info.status ===
+                            "progress_total"
+                        ) {
+
+                            const pct =
+                                Number(
+                                    info.progress || 0
+                                );
+
+
+                            progressBar.style.width =
+                                `${pct}%`;
+
+
+                            progressText.textContent =
+                                `Progression globale : ${pct.toFixed(1)}%`;
+
+                        }
+
+
+                        /* -------------------------------------
+                           DÉBUT D'UN FICHIER
+                           ------------------------------------- */
+
+                        if (
+                            info.status ===
+                            "download"
+                        ) {
+
+                            if (
+                                premierTelechargement === null
+                            ) {
+
+                                premierTelechargement =
+                                    maintenant;
+
+                            }
+
+
+                            const nom =
+                                info.file ||
+                                "fichier inconnu";
+
+
+                            if (
+                                !fichiers.has(nom)
+                            ) {
+
+                                fichiers.set(
+                                    nom,
+                                    {
+                                        loaded: 0,
+                                        total: 0
+                                    }
+                                );
+
+                            }
+
+                        }
+
+
+                        /* -------------------------------------
+                           PROGRESSION FICHIER
+                           ------------------------------------- */
+
+                        if (
+                            info.status ===
+                            "progress"
+                        ) {
+
+                            if (
+                                premierTelechargement === null
+                            ) {
+
+                                premierTelechargement =
+                                    maintenant;
+
+                            }
+
+
+                            dernierTelechargement =
+                                maintenant;
+
+
+                            const nom =
+                                info.file ||
+                                "fichier inconnu";
+
+
+                            fichiers.set(
+
+                                nom,
+
+                                {
+                                    loaded:
+                                        info.loaded || 0,
+
+                                    total:
+                                        info.total || 0
+                                }
+
+                            );
+
+
+                            afficherDetails();
+
+                        }
+
+
+                        /* -------------------------------------
+                           FICHIER TERMINÉ
+                           ------------------------------------- */
+
+                        if (
+                            info.status ===
+                            "done"
+                        ) {
+
+                            dernierTelechargement =
+                                maintenant;
+
+
+                            afficherDetails();
+
+                        }
+
+                    }
+
                 }
 
             );
@@ -189,13 +383,129 @@ charger.onclick = async () => {
             ).toFixed(1);
 
 
+        /* =====================================================
+           TEMPS DE TÉLÉCHARGEMENT OBSERVÉ
+           ===================================================== */
+
+        let tempsTelechargement =
+            0;
+
+
+        if (
+            premierTelechargement !== null &&
+            dernierTelechargement !== null
+        ) {
+
+            tempsTelechargement =
+                (
+                    (
+                        dernierTelechargement -
+                        premierTelechargement
+                    )
+                    / 1000
+                );
+
+        }
+
+
+        /* =====================================================
+           TAILLE DES FICHIERS
+           ===================================================== */
+
+        totalBytesTelecharges = 0;
+
+
+        for (
+            const valeur
+            of fichiers.values()
+        ) {
+
+            if (
+                valeur.total >
+                valeur.loaded
+            ) {
+
+                totalBytesTelecharges +=
+                    valeur.total;
+
+            }
+
+            else {
+
+                totalBytesTelecharges +=
+                    valeur.loaded;
+
+            }
+
+        }
+
+
+        const totalMo =
+            totalBytesTelecharges /
+            1024 /
+            1024;
+
+
+        /* =====================================================
+           TEMPS APRÈS LE DERNIER TÉLÉCHARGEMENT
+           ===================================================== */
+
+        let tempsApresTelechargement =
+            0;
+
+
+        if (
+            dernierTelechargement !== null
+        ) {
+
+            tempsApresTelechargement =
+                (
+                    (
+                        finChargement -
+                        dernierTelechargement
+                    )
+                    / 1000
+                );
+
+        }
+
+
+        progressBar.style.width =
+            "100%";
+
+
+        progressText.textContent =
+            "Chargement terminé";
+
+
         etat.textContent =
-            `Whisper est prêt — WebGPU — Chargement : ${tempsChargementWhisper} s`;
+            "Whisper Small est prêt.";
+
+
+        diagnostic.innerHTML =
+
+            `<b>Temps total pipeline :</b> ` +
+            `${tempsChargementWhisper} s<br>` +
+
+            `<b>Téléchargement observé :</b> ` +
+            `${tempsTelechargement.toFixed(1)} s<br>` +
+
+            `<b>Après le dernier téléchargement :</b> ` +
+            `${tempsApresTelechargement.toFixed(1)} s<br>` +
+
+            `<b>Données observées :</b> ` +
+            `${totalMo.toFixed(1)} Mo<br>` +
+
+            `<b>Nombre de fichiers observés :</b> ` +
+            `${fichiers.size}`;
 
 
         performances.innerHTML =
+
             `Mode : WebGPU<br>` +
-            `Chargement Whisper : ${tempsChargementWhisper} s`;
+
+            `Chargement Whisper : ` +
+            `${tempsChargementWhisper} s`;
 
 
         parler.disabled = false;
@@ -204,14 +514,11 @@ charger.onclick = async () => {
 
     catch (error) {
 
-        console.error(
-            "Erreur chargement Whisper WebGPU :",
-            error
-        );
+        console.error(error);
 
 
         etat.textContent =
-            "Erreur pendant le chargement de Whisper avec WebGPU. Ouvre F12 > Console.";
+            "Erreur pendant le chargement. Ouvre F12 > Console.";
 
 
         charger.disabled = false;
@@ -222,7 +529,67 @@ charger.onclick = async () => {
 
 
 /* =========================================================
-   ENREGISTREMENT + WHISPER
+   AFFICHAGE DES FICHIERS
+   ========================================================= */
+
+function afficherDetails() {
+
+    let texte = "";
+
+
+    for (
+        const [nom, valeur]
+        of fichiers.entries()
+    ) {
+
+        const loadedMo =
+            valeur.loaded /
+            1024 /
+            1024;
+
+
+        const totalMo =
+            valeur.total /
+            1024 /
+            1024;
+
+
+        let pct = 0;
+
+
+        if (
+            valeur.total > 0
+        ) {
+
+            pct =
+                valeur.loaded /
+                valeur.total *
+                100;
+
+        }
+
+
+        texte +=
+
+            `${nom}\n` +
+
+            `  ${loadedMo.toFixed(1)} / ` +
+
+            `${totalMo.toFixed(1)} Mo ` +
+
+            `(${pct.toFixed(0)}%)\n\n`;
+
+    }
+
+
+    detailsChargement.textContent =
+        texte;
+
+}
+
+
+/* =========================================================
+   RECONNAISSANCE
    ========================================================= */
 
 parler.onclick = async () => {
@@ -312,10 +679,6 @@ parler.onclick = async () => {
             "(aucun texte reconnu)";
 
 
-        /* =====================================================
-           NORMALISATION
-           ===================================================== */
-
         const recognizedNormalized =
             normalizeArabic(
                 recognized
@@ -335,10 +698,6 @@ parler.onclick = async () => {
                 ""
             );
 
-
-        /* =====================================================
-           LEVENSHTEIN
-           ===================================================== */
 
         const distance =
             levenshtein(
@@ -369,10 +728,6 @@ parler.onclick = async () => {
             );
 
 
-        /* =====================================================
-           RÉSULTAT
-           ===================================================== */
-
         comparaison.textContent =
 
             `Distance : ${distance} — ` +
@@ -392,39 +747,32 @@ parler.onclick = async () => {
             );
 
 
-        /* =====================================================
-           PERFORMANCES
-           ===================================================== */
-
         etat.textContent =
 
             `Analyse terminée — ` +
 
-            `WebGPU — ` +
-
-            `Temps : ${tempsAnalyse} s`;
+            `${tempsAnalyse} s`;
 
 
         performances.innerHTML =
 
             `Mode : WebGPU<br>` +
 
-            `Chargement Whisper : ${tempsChargementWhisper} s<br>` +
+            `Chargement Whisper : ` +
+            `${tempsChargementWhisper} s<br>` +
 
-            `Analyse n°${numeroAnalyse} : ${tempsAnalyse} s`;
+            `Analyse n°${numeroAnalyse} : ` +
+            `${tempsAnalyse} s`;
 
     }
 
     catch (error) {
 
-        console.error(
-            "Erreur reconnaissance :",
-            error
-        );
+        console.error(error);
 
 
         etat.textContent =
-            "Erreur pendant l'analyse. Ouvre F12 > Console.";
+            "Erreur pendant l'analyse.";
 
     }
 
@@ -441,7 +789,7 @@ parler.onclick = async () => {
 
 
 /* =========================================================
-   ENREGISTREMENT AUDIO
+   ENREGISTREMENT
    ========================================================= */
 
 async function recordAudio() {
@@ -568,7 +916,8 @@ async function recordAudio() {
                 }
 
 
-                const audio16k =
+                resolve(
+
                     resampleAudio(
 
                         merged,
@@ -577,11 +926,8 @@ async function recordAudio() {
 
                         WHISPER_SAMPLE_RATE
 
-                    );
+                    )
 
-
-                resolve(
-                    audio16k
                 );
 
             }
@@ -610,10 +956,6 @@ async function recordAudio() {
 
                     );
 
-
-                    /* =========================================
-                       VOLUME RMS
-                       ========================================= */
 
                     let sumSquares = 0;
 
@@ -646,10 +988,6 @@ async function recordAudio() {
                         Date.now();
 
 
-                    /* =========================================
-                       PAROLE DÉTECTÉE
-                       ========================================= */
-
                     if (
                         rms >
                         SILENCE_THRESHOLD
@@ -664,10 +1002,6 @@ async function recordAudio() {
 
                     }
 
-
-                    /* =========================================
-                       SILENCE DE 3 SECONDES
-                       ========================================= */
 
                     if (
 
@@ -712,7 +1046,7 @@ async function recordAudio() {
 
 
 /* =========================================================
-   FUSION AUDIO
+   AUDIO HELPERS
    ========================================================= */
 
 function mergeBuffers(
@@ -762,10 +1096,6 @@ function mergeBuffers(
 }
 
 
-/* =========================================================
-   RESAMPLING 16 kHz
-   ========================================================= */
-
 function resampleAudio(
 
     input,
@@ -797,7 +1127,6 @@ function resampleAudio(
         Math.round(
 
             input.length /
-
             ratio
 
         );
