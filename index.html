@@ -5,12 +5,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Whisper local — WebGPU</title>
+    <title>Whisper Small — Diagnostic WebGPU</title>
 
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 760px;
+            max-width: 800px;
             margin: 40px auto;
             padding: 0 20px;
             line-height: 1.6;
@@ -40,21 +40,43 @@
             text-align: right;
             font-size: 22px;
         }
+
+        #progressBarContainer {
+            width: 100%;
+            height: 22px;
+            background: #eee;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        #progressBar {
+            width: 0%;
+            height: 100%;
+            background: #555;
+            transition: width 0.2s;
+        }
+
+        #detailsChargement {
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 
-
 <body>
 
-    <h2>Whisper local — Test WebGPU</h2>
-
+    <h2>Whisper Small — Diagnostic du premier chargement</h2>
 
     <div class="bloc">
 
-        <b>Accélération :</b>
+        <b>WebGPU :</b>
 
         <p id="gpu">
-            Vérification de WebGPU...
+            Vérification...
         </p>
 
     </div>
@@ -74,6 +96,29 @@
             Whisper n'est pas encore chargé.
         </p>
 
+
+        <div id="progressBarContainer">
+            <div id="progressBar"></div>
+        </div>
+
+        <p id="progressText">
+            Progression : —
+        </p>
+
+    </div>
+
+
+    <div class="bloc">
+
+        <b>Diagnostic du chargement :</b>
+
+        <p id="diagnostic">
+            —
+        </p>
+
+        <div id="detailsChargement">
+        </div>
+
     </div>
 
 
@@ -92,10 +137,7 @@
 
         <b>Texte reconnu :</b>
 
-        <p
-            id="resultat"
-            class="arabe"
-        >
+        <p id="resultat" class="arabe">
             —
         </p>
 
@@ -124,10 +166,7 @@
     </div>
 
 
-    <script
-        type="module"
-        src="./app.js"
-    ></script>
+    <script type="module" src="./app.js"></script>
 
 </body>
 
