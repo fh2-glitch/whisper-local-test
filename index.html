@@ -3,48 +3,131 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Whisper local</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Whisper local — WebGPU</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 760px;
+            margin: 40px auto;
+            padding: 0 20px;
+            line-height: 1.6;
+        }
+
+        button {
+            padding: 12px 18px;
+            margin-right: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .bloc {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+
+        .arabe {
+            direction: rtl;
+            text-align: right;
+            font-size: 22px;
+        }
+    </style>
 </head>
 
-<body style="font-family:Arial;max-width:760px;margin:40px auto;padding:0 20px;line-height:1.6">
 
-    <h2>Whisper local — Test arabe</h2>
+<body>
 
-    <button id="charger">1. Charger Whisper</button>
-    <button id="parler" disabled>2. Parler</button>
+    <h2>Whisper local — Test WebGPU</h2>
 
-    <p id="etat">
-        <b>Whisper n'est pas encore chargé.</b>
-    </p>
 
-    <hr>
+    <div class="bloc">
 
-    <b>Phrase attendue :</b>
+        <b>Accélération :</b>
 
-    <p dir="rtl" style="font-size:22px">
-        يساعدنا الغذاء الصحي وممارسة الرياضة على النمو السليم والنجاح في دراستنا
-    </p>
+        <p id="gpu">
+            Vérification de WebGPU...
+        </p>
 
-    <b>Texte reconnu :</b>
+    </div>
 
-    <p id="resultat" dir="rtl" style="font-size:22px">
-        —
-    </p>
 
-    <b>Comparaison :</b>
+    <div class="bloc">
 
-    <p id="comparaison">
-        —
-    </p>
+        <button id="charger">
+            1. Charger Whisper
+        </button>
 
-    <b>Performances :</b>
+        <button id="parler" disabled>
+            2. Parler
+        </button>
 
-    <p id="performances">
-        —
-    </p>
+        <p id="etat">
+            Whisper n'est pas encore chargé.
+        </p>
 
-    <script type="module" src="./app.js"></script>
+    </div>
+
+
+    <div class="bloc">
+
+        <b>Phrase attendue :</b>
+
+        <p class="arabe">
+            يساعدنا الغذاء الصحي وممارسة الرياضة على النمو السليم والنجاح في دراستنا
+        </p>
+
+    </div>
+
+
+    <div class="bloc">
+
+        <b>Texte reconnu :</b>
+
+        <p
+            id="resultat"
+            class="arabe"
+        >
+            —
+        </p>
+
+    </div>
+
+
+    <div class="bloc">
+
+        <b>Comparaison :</b>
+
+        <p id="comparaison">
+            —
+        </p>
+
+    </div>
+
+
+    <div class="bloc">
+
+        <b>Performances :</b>
+
+        <p id="performances">
+            —
+        </p>
+
+    </div>
+
+
+    <script
+        type="module"
+        src="./app.js"
+    ></script>
 
 </body>
 
